@@ -1,0 +1,40 @@
+{
+    "dataSources": {
+        "estat": {
+            "name": "e-Stat（日本政府統計）",
+            "baseUrl": "https://api.e-stat.go.jp/rest/3.0",
+            "apiKey": "YOUR_ESTAT_API_KEY",
+            "enabled": true,
+            "description": "日本の政府統計データを横断的に検索・取得できるAPI",
+            "license": "政府標準利用規約（第2.0版）準拠"
+        },
+        "worldbank": {
+            "name": "World Bank Data",
+            "baseUrl": "https://api.worldbank.org/v2",
+            "apiKey": null,
+            "enabled": true,
+            "description": "世界銀行の開発指標データ（WDI等）",
+            "license": "CC BY 4.0"
+        },
+        "oecd": {
+            "name": "OECD Data",
+            "baseUrl": "https://sdmx.oecd.org/public/rest",
+            "apiKey": null,
+            "enabled": true,
+            "description": "OECD加盟国の経済・社会統計（SDMX-JSON形式）",
+            "license": "利用条件あり（更新・停止リスクに注意）"
+        },
+        "eurostat": {
+            "name": "Eurostat",
+            "baseUrl": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0",
+            "apiKey": null,
+            "enabled": true,
+            "description": "EU統計局のデータ（JSON-stat 2.0形式）",
+            "license": "商用/非商用再利用可（出所表示必須）"
+        }
+    },
+    "server": {
+        "name": "mcp-statistics-server",
+        "version": "1.0.0"
+    }
+}

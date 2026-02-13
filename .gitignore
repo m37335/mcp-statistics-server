@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.log
+.env
+config.local.json
+.DS_Store
+
+# APIキーを含む設定ファイルを除外
+config.json
