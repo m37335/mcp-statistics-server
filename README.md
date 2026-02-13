@@ -353,6 +353,10 @@ OECDから日本の四半期GDPデータを取得してください
 
 ## トラブルシューティング
 
+### コミットできない場合
+
+「Please tell me who you are」などと出る場合は、Git の `user.name` と `user.email` が未設定です。リポジトリで `git config user.name "名前"` と `git config user.email "メール"` を設定してください。詳しくは [docs/GITHUB_AUTH_CURSOR.md](docs/GITHUB_AUTH_CURSOR.md) の冒頭を参照。
+
 ### Git プッシュで認証エラーになる場合
 
 Cursor やターミナルで `git push` が「could not read Username」などで失敗する場合の対処は [docs/GITHUB_AUTH_CURSOR.md](docs/GITHUB_AUTH_CURSOR.md) を参照してください（GitHub 拡張のサインイン・PAT・SSH の3通り）。
@@ -417,11 +421,9 @@ npm test
 
 ## 開発
 
-### スクリプト（オプション）
+このリポジトリには **MCP サーバー本体のみ** を含めています。`.cursor/`（IDE設定）、`output/`（生成チャート・データ）、`scripts/`（開発用スクリプト）は `.gitignore` で除外しており、必要に応じてローカルで作成・利用してください。
 
-`scripts/` には、開発・検証・バッチ用の補助スクリプトがあります。**通常の利用では不要**です。MCP クライアントからツールを呼ぶのが本筋です。実行する場合はプロジェクトルートから `node scripts/xxx.js` で行います。一覧と説明は [scripts/README.md](scripts/README.md) を参照してください。
-
-### ディレクトリ構成
+### ディレクトリ構成（リポジトリに含まれるもの）
 
 ```
 MCP_statistics/
@@ -429,17 +431,13 @@ MCP_statistics/
 │   ├── README.md          # ドキュメント一覧
 │   ├── MCP_USAGE.md       # MCPの正しい使い方
 │   ├── CHART_GUIDE.md     # チャート生成の使い方
+│   ├── GITHUB_AUTH_CURSOR.md
 │   ├── DATA_EXPORT_GUIDE.md
 │   ├── STATISTICS_GUIDE.md
 │   ├── COMPARISON_EXAMPLES.md
 │   ├── PROMPT_EXAMPLES.md
 │   ├── SETUP.md
 │   └── STATISTICAL_FEATURES_PROPOSAL.md
-├── output/                # 試験的に作成したチャート・データ・レポート
-│   ├── charts/            # 生成したSVGチャート
-│   ├── data/              # 取得したデータ（JSON）
-│   └── reports/           # 分析レポート等
-├── scripts/               # オプションの補助スクリプト（開発・バッチ用）
 ├── src/
 │   ├── index.ts           # メインサーバー
 │   ├── config.ts          # 設定読み込み

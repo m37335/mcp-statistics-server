@@ -1,5 +1,19 @@
 # Cursor で GitHub にプッシュする（認証エラーを防ぐ）
 
+## コミットできない場合（「Please tell me who you are」など）
+
+Git はコミット時に **誰がコミットしたか** が必要です。未設定だとコミットできません。
+
+**対処（このリポジトリだけに設定）：**
+```bash
+git config user.name "あなたの名前"
+git config user.email "your-email@example.com"
+```
+
+**全リポジトリに設定する場合：** 上記の `git config` に `--global` を付けて実行します。
+
+---
+
 拡張機能をインストールしたあと、**やることは2つだけ**です。
 
 ---

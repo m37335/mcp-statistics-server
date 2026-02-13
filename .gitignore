@@ -10,5 +10,9 @@ config.local.json
 # APIキーを含む設定ファイルを除外
 config.json
 
-# Cursor設定（オプション: 共有したい場合は削除）
-# .cursor/
+# Cursor設定（ローカル用・リポジトリには含めない）
+.cursor/
+
+# 生成物・開発用（MCPサーバー本体のみをGitHubに公開する）
+output/
+scripts/
