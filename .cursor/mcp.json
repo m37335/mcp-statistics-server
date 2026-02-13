@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "statistics": {
+      "command": "node",
+      "args": [
+        "/Volumes/OWC Express 1M2/Documents/MCP_statistics/dist/index.js"
+      ],
+      "env": {}
+    }
+  }
+}

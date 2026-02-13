@@ -34,17 +34,17 @@ export class OECDClient {
         
         return withRetry(async () => {
             try {
+                // OECD APIの正しい形式: /data/{datasetId}/{filter}/all
+                // フィルターが指定されていない場合は 'all/all' を使用
                 const filterPart = params.filter || 'all';
-                const url = `${this.config.baseUrl}/data/${params.datasetId}/${filterPart}`;
+                const url = `${this.config.baseUrl}/data/${params.datasetId}/${filterPart}/all`;
 
                 const response = await axios.get(url, {
                     params: {
-                        startPeriod: params.startPeriod,
-                        endPeriod: params.endPeriod,
+                        // OECD APIは startTime/endTime を使用（startPeriod/endPeriod を変換）
+                        startTime: params.startPeriod,
+                        endTime: params.endPeriod,
                         dimensionAtObservation: 'AllDimensions',
-                    },
-                    headers: {
-                        'Accept': 'application/vnd.sdmx.data+json;version=1.0.0-wd',
                     },
                 });
 
@@ -70,6 +70,8 @@ export class OECDClient {
         
         return withRetry(async () => {
             try {
+                // OECD APIのデータセット一覧は別のエンドポイントを使用
+                // 注: このメソッドは現在のOECD APIでは直接サポートされていない可能性があります
                 const response = await axios.get(`${this.config.baseUrl}/dataflow/OECD/all`, {
                     headers: {
                         'Accept': 'application/vnd.sdmx.structure+json;version=1.0.0',
@@ -99,6 +101,7 @@ export class OECDClient {
         
         return withRetry(async () => {
             try {
+                // OECD APIのデータ構造取得エンドポイント
                 const response = await axios.get(`${this.config.baseUrl}/datastructure/OECD/${datasetId}`, {
                     headers: {
                         'Accept': 'application/vnd.sdmx.structure+json;version=1.0.0',

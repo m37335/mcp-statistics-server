@@ -25,7 +25,14 @@ import type {
     WorldBankSearchIndicatorsArgs,
     OECDGetDataArgs,
     EurostatGetDataArgs,
+    GenerateChartArgs,
+    ExportDataArgs,
+    CalculateStatisticsArgs,
 } from './types.js';
+import { ChartService } from './charts/chartService.js';
+import { DataExportService } from './services/dataExportService.js';
+import { calculateStatistics, calculateGroupedStatistics } from './statistics/basicStats.js';
+import { formatWorldBankDataForAnalysis, formatEStatDataForAnalysis } from './utils/dataFormatter.js';
 
 // 設定を読み込み（環境変数 > config.json）
 const config = await loadConfig();
@@ -91,7 +98,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
 // リソースの内容を返す
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const uri = request.params.uri;
-    const match = uri.match(/^stats:\/\/([^\/]+)\/info$/);
+    const match = uri.match(/^stats:\/\/([^/]+)\/info$/);
 
     if (!match) {
         throw new Error(`Unknown resource: ${uri}`);
@@ -180,7 +187,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     properties: {
                         countryCode: {
                             type: 'string',
-                            description: '国コード（例: JP, US, CN）',
+                            description: '国コード（例: JP, US, CN。複数国はセミコロン区切り: USA;JPN;CHN）',
                         },
                         indicatorCode: {
                             type: 'string',
@@ -270,6 +277,175 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         });
     }
 
+    // データエクスポートツール
+    tools.push({
+        name: 'export_data',
+        description: '統計データを専門ツールで分析しやすい形式（CSV/JSON）で出力します',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                dataSource: {
+                    type: 'string',
+                    enum: ['worldbank', 'estat'],
+                    description: 'データソース',
+                },
+                dataParams: {
+                    type: 'object',
+                    description: 'データソース固有のパラメータ',
+                    properties: {
+                        countryCode: { type: 'string', description: '国コード（World Bank用、例: USA;JPN）' },
+                        indicatorCode: { type: 'string', description: '指標コード（World Bank用、例: NY.GDP.MKTP.CD）' },
+                        startYear: { type: 'number', description: '開始年（World Bank用）' },
+                        endYear: { type: 'number', description: '終了年（World Bank用）' },
+                        statsDataId: { type: 'string', description: '統計表ID（e-Stat用）' },
+                        limit: { type: 'number', description: '取得件数（e-Stat用）' },
+                    },
+                },
+                format: {
+                    type: 'string',
+                    enum: ['csv', 'json', 'json-structured'],
+                    description: '出力形式（csv: CSV形式, json: JSON配列, json-structured: 構造化JSON）',
+                },
+                transform: {
+                    type: 'object',
+                    description: 'データの変換オプション',
+                    properties: {
+                        asTimeSeries: {
+                            type: 'object',
+                            description: '時系列形式に変換',
+                            properties: {
+                                dateColumn: { type: 'string' },
+                                valueColumn: { type: 'string' },
+                                groupColumn: { type: 'string' },
+                            },
+                        },
+                        asPivot: {
+                            type: 'object',
+                            description: 'ピボット形式に変換',
+                            properties: {
+                                indexColumn: { type: 'string' },
+                                columnsColumn: { type: 'string' },
+                                valuesColumn: { type: 'string' },
+                            },
+                        },
+                        filter: { type: 'object', description: 'フィルタリング条件' },
+                        sort: {
+                            type: 'array',
+                            description: 'ソート条件',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    column: { type: 'string' },
+                                    order: { type: 'string', enum: ['asc', 'desc'] },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            required: ['dataSource', 'dataParams', 'format'],
+        },
+    });
+
+    // 統計量計算ツール
+    tools.push({
+        name: 'calculate_statistics',
+        description: '統計データから基本的な統計量（平均、中央値、標準偏差など）を計算します',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                dataSource: {
+                    type: 'string',
+                    enum: ['worldbank', 'estat'],
+                    description: 'データソース',
+                },
+                dataParams: {
+                    type: 'object',
+                    description: 'データソース固有のパラメータ',
+                    properties: {
+                        countryCode: { type: 'string', description: '国コード（World Bank用、例: USA;JPN）' },
+                        indicatorCode: { type: 'string', description: '指標コード（World Bank用、例: NY.GDP.MKTP.CD）' },
+                        startYear: { type: 'number', description: '開始年（World Bank用）' },
+                        endYear: { type: 'number', description: '終了年（World Bank用）' },
+                        statsDataId: { type: 'string', description: '統計表ID（e-Stat用）' },
+                        limit: { type: 'number', description: '取得件数（e-Stat用）' },
+                    },
+                },
+                statistics: {
+                    type: 'array',
+                    description: '計算する統計量',
+                    items: {
+                        type: 'string',
+                        enum: ['mean', 'median', 'mode', 'std', 'variance', 'min', 'max', 'range', 'q1', 'q3', 'iqr'],
+                    },
+                },
+                groupBy: {
+                    type: 'string',
+                    description: 'グループ化する列（例: country_code, year）',
+                },
+                valueColumn: {
+                    type: 'string',
+                    description: '値の列名（デフォルト: value）',
+                },
+            },
+            required: ['dataSource', 'dataParams', 'statistics'],
+        },
+    });
+
+    // チャート生成ツール
+    tools.push({
+        name: 'generate_chart',
+        description: '統計データからチャートやグラフを生成します（SVG形式）',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                chartType: {
+                    type: 'string',
+                    enum: ['line', 'bar', 'pie'],
+                    description: 'チャートタイプ（line: 折れ線グラフ, bar: 棒グラフ, pie: 円グラフ）',
+                },
+                dataSource: {
+                    type: 'string',
+                    enum: ['worldbank', 'estat'],
+                    description: 'データソース',
+                },
+                dataParams: {
+                    type: 'object',
+                    description: 'データソース固有のパラメータ',
+                    properties: {
+                        countryCode: { type: 'string', description: '国コード（World Bank用、例: USA;JPN）' },
+                        indicatorCode: { type: 'string', description: '指標コード（World Bank用、例: NY.GDP.MKTP.CD）' },
+                        startYear: { type: 'number', description: '開始年（World Bank用）' },
+                        endYear: { type: 'number', description: '終了年（World Bank用）' },
+                        statsDataId: { type: 'string', description: '統計表ID（e-Stat用）' },
+                        limit: { type: 'number', description: '取得件数（e-Stat用）' },
+                    },
+                },
+                title: {
+                    type: 'string',
+                    description: 'チャートタイトル',
+                },
+                xLabel: {
+                    type: 'string',
+                    description: 'X軸ラベル',
+                },
+                yLabel: {
+                    type: 'string',
+                    description: 'Y軸ラベル',
+                },
+                width: {
+                    type: 'number',
+                    description: 'チャート幅（デフォルト: 800）',
+                },
+                height: {
+                    type: 'number',
+                    description: 'チャート高さ（デフォルト: 400）',
+                },
+            },
+            required: ['chartType', 'dataSource', 'dataParams'],
+        },
+    });
+
     return { tools };
 });
 
@@ -310,6 +486,82 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         // Eurostat
         else if (toolName === 'eurostat_get_data' && clients.eurostat) {
             result = await clients.eurostat.getData(validatedArgs as EurostatGetDataArgs);
+        }
+        // データエクスポート
+        else if (toolName === 'export_data') {
+            const exportService = new DataExportService(clients.worldbank, clients.estat);
+            result = await exportService.exportData(validatedArgs as ExportDataArgs);
+        }
+        // 統計量計算
+        else if (toolName === 'calculate_statistics') {
+            const statsArgs = validatedArgs as CalculateStatisticsArgs;
+            
+            // データを取得
+            let rawData: any;
+            if (statsArgs.dataSource === 'worldbank' && clients.worldbank) {
+                const { countryCode, indicatorCode, startYear, endYear } = statsArgs.dataParams;
+                rawData = await clients.worldbank.getIndicatorData({
+                    countryCode: countryCode!,
+                    indicatorCode: indicatorCode!,
+                    startYear,
+                    endYear,
+                });
+            } else if (statsArgs.dataSource === 'estat' && clients.estat) {
+                const { statsDataId, limit } = statsArgs.dataParams;
+                rawData = await clients.estat.getStatsData({
+                    statsDataId: statsDataId!,
+                    limit: limit || 10000,
+                });
+            } else {
+                throw new Error(`Data source not available: ${statsArgs.dataSource}`);
+            }
+            
+            // データを整形
+            const formattedData = statsArgs.dataSource === 'worldbank'
+                ? formatWorldBankDataForAnalysis(rawData)
+                : formatEStatDataForAnalysis(rawData);
+            
+            // 値の列を取得
+            const valueColumn = statsArgs.valueColumn || 'value';
+            
+            // グループ化する場合
+            if (statsArgs.groupBy) {
+                const groupedStats = calculateGroupedStatistics(
+                    formattedData,
+                    statsArgs.groupBy,
+                    valueColumn,
+                    statsArgs.statistics
+                );
+                result = {
+                    statistics: groupedStats,
+                    grouped: true,
+                    groupBy: statsArgs.groupBy,
+                };
+            } else {
+                // 全体の統計量を計算
+                const values = formattedData
+                    .map(row => Number(row[valueColumn]))
+                    .filter(v => !isNaN(v));
+                
+                const stats = calculateStatistics(values, statsArgs.statistics);
+                result = {
+                    statistics: stats,
+                    grouped: false,
+                    dataPoints: values.length,
+                };
+            }
+        }
+        // チャート生成
+        else if (toolName === 'generate_chart') {
+            const chartService = new ChartService(clients.worldbank, clients.estat);
+            const svg = await chartService.generateChart(validatedArgs as GenerateChartArgs);
+            // SVGをBase64エンコードして返す（MCPのimageタイプとして返すことも可能）
+            const base64Svg = Buffer.from(svg).toString('base64');
+            result = {
+                svg: svg,
+                dataUri: `data:image/svg+xml;base64,${base64Svg}`,
+                format: 'svg',
+            };
         } else {
             throw new Error(`Unknown tool: ${name}`);
         }

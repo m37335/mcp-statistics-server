@@ -58,7 +58,13 @@ export class WorldBankClient {
 
                 // World Bank APIは [metadata, data] の配列を返す
                 const data = response.data[1];
-                return Array.isArray(data) ? data : [];
+                
+                // データが存在しない場合、空配列を返す（エラーではなく正常な動作）
+                if (!data || !Array.isArray(data)) {
+                    return [];
+                }
+                
+                return data;
             } catch (error) {
                 throw createApiErrorFromAxiosError(this.sourceName, error);
             }
@@ -79,7 +85,7 @@ export class WorldBankClient {
                 const response = await axios.get(`${this.config.baseUrl}/indicator`, {
                     params: {
                         format: 'json',
-                        per_page: 50,
+                        per_page: 500, // より多くの指標を取得
                     },
                 });
 
