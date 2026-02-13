@@ -242,6 +242,44 @@ npm run build
 データソースに接続できない場合：
 1. インターネット接続を確認
 2. データソースのAPIエンドポイントが変更されていないか確認
+3. ログを確認して詳細なエラー情報を確認
+
+### テストエラー
+
+テストが失敗する場合：
+```bash
+# 依存関係を再インストール
+npm install
+
+# テストを再実行
+npm test
+```
+
+## 機能
+
+### 型安全性
+- すべてのツール引数にTypeScript型定義を実装
+- コンパイル時の型チェックにより、実行時エラーを防止
+
+### 入力バリデーション
+- 各ツールの引数に対して必須パラメータチェックと値の検証を実装
+- 不正な入力値に対して明確なエラーメッセージを提供
+
+### エラーハンドリング
+- 詳細なAPIエラー情報（ステータスコード、レスポンス本文）を含むエラーメッセージ
+- 各データソースのレスポンス形式を検証し、予期しない形式の場合に適切に処理
+
+### ログ機能
+- 構造化ログ（リクエスト/レスポンス、エラー）を実装
+- デバッグとモニタリングを容易にする
+
+### リトライ機能
+- ネットワークエラーや一時的なサーバーエラー（429, 500, 502, 503, 504）で自動リトライ
+- 指数バックオフによる待機時間の調整（デフォルト: 最大3回、初期待機1秒）
+
+### レート制限
+- データソースごとのレート制限管理
+- APIレート制限を超えないよう、リクエスト間隔を自動制御
 
 ## 開発
 
@@ -251,14 +289,27 @@ npm run build
 MCP_statistics/
 ├── src/
 │   ├── index.ts           # メインサーバー
+│   ├── config.ts          # 設定読み込み
+│   ├── types.ts           # 型定義
+│   ├── validation.ts      # 入力バリデーション
+│   ├── errors.ts          # エラーハンドリング
+│   ├── logger.ts          # ログ機能
+│   ├── retry.ts           # リトライ機能
+│   ├── rateLimiter.ts     # レート制限
+│   ├── __tests__/         # テストファイル
 │   └── sources/
 │       ├── estat.ts       # e-Statクライアント
 │       ├── worldbank.ts   # World Bankクライアント
 │       ├── oecd.ts        # OECDクライアント
 │       └── eurostat.ts    # Eurostatクライアント
+├── .github/
+│   └── workflows/
+│       └── ci.yml         # CI/CDパイプライン
 ├── config.json            # 設定ファイル
 ├── package.json
-└── tsconfig.json
+├── tsconfig.json
+├── jest.config.js         # Jest設定
+└── .eslintrc.json         # ESLint設定
 ```
 
 ### 開発モード
@@ -266,6 +317,39 @@ MCP_statistics/
 ```bash
 npm run dev  # TypeScriptの変更を監視
 ```
+
+### テスト
+
+```bash
+# テストを実行
+npm test
+
+# ウォッチモードでテストを実行
+npm run test:watch
+
+# カバレッジレポートを生成
+npm run test:coverage
+```
+
+### リント
+
+```bash
+# リントを実行
+npm run lint
+
+# 自動修正
+npm run lint:fix
+```
+
+### CI/CD
+
+GitHub Actionsを使用して、プッシュ時に自動的に以下を実行します：
+
+- ビルド（TypeScriptコンパイル）
+- テスト（Jest）
+- リント（ESLint）
+
+ワークフローファイル: `.github/workflows/ci.yml`
 
 ## 参考資料
 
