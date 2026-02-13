@@ -2,6 +2,12 @@
 
 国内外の統計データソースにアクセスするためのMCP（Model Context Protocol）サーバーです。LLMから統計データを直接取得できます。
 
+## MCPの使い方（推奨）
+
+**通常の利用では、Cursor や Claude Desktop のチャットで「データを取得して」「グラフを描いて」と依頼し、AI がこのサーバーのツール（`estat_get_data` や `generate_chart` など）を呼び出す形が正しい使い方です。** 毎回スクリプトを書いたり `node xxx.js` を手で実行する必要はありません。
+
+詳しくは [docs/MCP_USAGE.md](docs/MCP_USAGE.md) を参照してください。
+
 ## 概要
 
 このMCPサーバーは、以下のデータソースへのアクセスを提供します：
@@ -116,6 +122,22 @@ Claude DesktopやCursorなどのMCPクライアントで使用する場合、設
 
 ## 利用可能なツール
 
+設定で有効にしたデータソースおよび共通機能に対応する、次のツールを提供します。
+
+| ツール名 | 説明 | 備考 |
+|----------|------|------|
+| `estat_search_stats` | e-Statで統計表を検索 | e-Stat有効時 |
+| `estat_get_data` | e-Statから統計データを取得 | e-Stat有効時 |
+| `worldbank_get_indicator` | World Bankの指標データを取得 | World Bank有効時。複数国はセミコロン区切り |
+| `worldbank_search_indicators` | World Bankの指標を検索 | World Bank有効時 |
+| `oecd_get_data` | OECDのデータを取得（SDMX形式） | OECD有効時 |
+| `eurostat_get_data` | Eurostatのデータを取得（JSON-stat形式） | Eurostat有効時 |
+| `export_data` | データをCSV/JSONで出力（専門ツール用） | worldbank または estat |
+| `calculate_statistics` | 基本統計量（平均・中央値・標準偏差等）を計算 | worldbank または estat |
+| `generate_chart` | チャート・グラフを生成（SVG） | worldbank または estat |
+
+---
+
 ### e-Stat
 
 #### `estat_search_stats`
@@ -141,16 +163,20 @@ Claude DesktopやCursorなどのMCPクライアントで使用する場合、設
 ### World Bank
 
 #### `worldbank_get_indicator`
-指標データを取得します。
+指標データを取得します。**複数国の横断比較が可能**です。
 
 ```typescript
 {
-  countryCode: string;    // 国コード（例: JP, US, CN）
+  countryCode: string;    // 国コード（例: JP, US, CN。複数国はセミコロン区切り: USA;JPN;CHN）
   indicatorCode: string;  // 指標コード（例: NY.GDP.MKTP.CD）
   startYear?: number;     // 開始年
   endYear?: number;       // 終了年
 }
 ```
+
+**複数国比較の例:**
+- `countryCode: "USA;JPN"` - アメリカと日本のデータを同時取得
+- `countryCode: "USA;JPN;CHN"` - アメリカ、日本、中国のデータを同時取得
 
 #### `worldbank_search_indicators`
 指標を検索します。
@@ -188,6 +214,99 @@ Claude DesktopやCursorなどのMCPクライアントで使用する場合、設
 }
 ```
 
+### チャート生成
+
+#### `generate_chart`
+統計データからチャートやグラフを生成します（SVG形式）。
+
+```typescript
+{
+  chartType: 'line' | 'bar' | 'pie';  // チャートタイプ
+  dataSource: 'worldbank' | 'estat';  // データソース
+  dataParams: {                        // データソース固有のパラメータ
+    countryCode?: string;              // 国コード（World Bank用、例: USA;JPN）
+    indicatorCode?: string;            // 指標コード（World Bank用、例: NY.GDP.MKTP.CD）
+    startYear?: number;                // 開始年（World Bank用）
+    endYear?: number;                  // 終了年（World Bank用）
+    statsDataId?: string;              // 統計表ID（e-Stat用）
+    limit?: number;                     // 取得件数（e-Stat用）
+  },
+  title?: string;                      // チャートタイトル
+  xLabel?: string;                     // X軸ラベル
+  yLabel?: string;                     // Y軸ラベル
+  width?: number;                      // チャート幅（デフォルト: 800）
+  height?: number;                     // チャート高さ（デフォルト: 400）
+}
+```
+
+詳細は [docs/CHART_GUIDE.md](docs/CHART_GUIDE.md) を参照してください。
+
+### データエクスポート
+
+#### `export_data`
+専門ツール（Python、R、Excel等）で分析しやすい形式（CSV/JSON）でデータを出力します。
+
+```typescript
+{
+  dataSource: 'worldbank' | 'estat';  // データソース
+  dataParams: {                        // データソース固有のパラメータ
+    countryCode?: string;              // 国コード（World Bank用、例: USA;JPN）
+    indicatorCode?: string;            // 指標コード（World Bank用、例: NY.GDP.MKTP.CD）
+    startYear?: number;                // 開始年（World Bank用）
+    endYear?: number;                  // 終了年（World Bank用）
+    statsDataId?: string;              // 統計表ID（e-Stat用）
+    limit?: number;                     // 取得件数（e-Stat用）
+  },
+  format: 'csv' | 'json' | 'json-structured';  // 出力形式
+  transform?: {                        // データ変換オプション
+    asTimeSeries?: {                   // 時系列形式に変換
+      dateColumn: string;
+      valueColumn: string;
+      groupColumn?: string;
+    };
+    asPivot?: {                        // ピボット形式に変換
+      indexColumn: string;
+      columnsColumn: string;
+      valuesColumn: string;
+    };
+    filter?: Record<string, unknown>;  // フィルタリング条件
+    sort?: Array<{                     // ソート条件
+      column: string;
+      order: 'asc' | 'desc';
+    }>;
+  };
+}
+```
+
+詳細は [docs/DATA_EXPORT_GUIDE.md](docs/DATA_EXPORT_GUIDE.md) を参照してください。
+
+### 統計量計算
+
+#### `calculate_statistics`
+統計データから基本的な統計量（平均、中央値、標準偏差など）を計算します。
+
+```typescript
+{
+  dataSource: 'worldbank' | 'estat';  // データソース
+  dataParams: {                        // データソース固有のパラメータ
+    countryCode?: string;              // 国コード（World Bank用、例: USA;JPN）
+    indicatorCode?: string;            // 指標コード（World Bank用、例: NY.GDP.MKTP.CD）
+    startYear?: number;                // 開始年（World Bank用）
+    endYear?: number;                  // 終了年（World Bank用）
+    statsDataId?: string;              // 統計表ID（e-Stat用）
+    limit?: number;                     // 取得件数（e-Stat用）
+  },
+  statistics: Array<                  // 計算する統計量
+    'mean' | 'median' | 'mode' | 'std' | 'variance' |
+    'min' | 'max' | 'range' | 'q1' | 'q3' | 'iqr'
+  >;
+  groupBy?: string;                    // グループ化する列（例: country_code, year）
+  valueColumn?: string;                 // 値の列名（デフォルト: value）
+}
+```
+
+詳細は [docs/STATISTICS_GUIDE.md](docs/STATISTICS_GUIDE.md) を参照してください。
+
 ## 使用例
 
 ### e-Statで人口統計を検索
@@ -196,7 +315,9 @@ Claude DesktopやCursorなどのMCPクライアントで使用する場合、設
 e-Statで「人口」に関する統計を検索してください
 ```
 
-### World BankでGDPデータを取得
+### World BankでGDPデータを取得（単一国）
+
+### World Bankで複数国のGDPを比較（横断比較）
 
 ```
 日本の2020年から2023年のGDPデータを取得してください
@@ -210,6 +331,15 @@ OECDから日本の四半期GDPデータを取得してください
 （データセットID: QNA）
 ```
 
+### チャート・グラフの生成
+
+```
+日米のGDPを折れ線グラフで比較してください
+（国コード: USA;JPN, 指標コード: NY.GDP.MKTP.CD, 期間: 2020-2023年）
+```
+
+詳細は [docs/CHART_GUIDE.md](docs/CHART_GUIDE.md) を参照してください。
+
 ## ライセンス情報
 
 各データソースのライセンス：
@@ -222,6 +352,10 @@ OECDから日本の四半期GDPデータを取得してください
 詳細は各データソースの公式サイトをご確認ください。
 
 ## トラブルシューティング
+
+### Git プッシュで認証エラーになる場合
+
+Cursor やターミナルで `git push` が「could not read Username」などで失敗する場合の対処は [docs/GITHUB_AUTH_CURSOR.md](docs/GITHUB_AUTH_CURSOR.md) を参照してください（GitHub 拡張のサインイン・PAT・SSH の3通り）。
 
 ### APIキーエラー
 
@@ -283,10 +417,29 @@ npm test
 
 ## 開発
 
+### スクリプト（オプション）
+
+`scripts/` には、開発・検証・バッチ用の補助スクリプトがあります。**通常の利用では不要**です。MCP クライアントからツールを呼ぶのが本筋です。実行する場合はプロジェクトルートから `node scripts/xxx.js` で行います。一覧と説明は [scripts/README.md](scripts/README.md) を参照してください。
+
 ### ディレクトリ構成
 
 ```
 MCP_statistics/
+├── docs/                  # ドキュメント
+│   ├── README.md          # ドキュメント一覧
+│   ├── MCP_USAGE.md       # MCPの正しい使い方
+│   ├── CHART_GUIDE.md     # チャート生成の使い方
+│   ├── DATA_EXPORT_GUIDE.md
+│   ├── STATISTICS_GUIDE.md
+│   ├── COMPARISON_EXAMPLES.md
+│   ├── PROMPT_EXAMPLES.md
+│   ├── SETUP.md
+│   └── STATISTICAL_FEATURES_PROPOSAL.md
+├── output/                # 試験的に作成したチャート・データ・レポート
+│   ├── charts/            # 生成したSVGチャート
+│   ├── data/              # 取得したデータ（JSON）
+│   └── reports/           # 分析レポート等
+├── scripts/               # オプションの補助スクリプト（開発・バッチ用）
 ├── src/
 │   ├── index.ts           # メインサーバー
 │   ├── config.ts          # 設定読み込み

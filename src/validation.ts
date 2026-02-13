@@ -5,6 +5,9 @@ import {
     WorldBankSearchIndicatorsArgs,
     OECDGetDataArgs,
     EurostatGetDataArgs,
+    GenerateChartArgs,
+    ExportDataArgs,
+    CalculateStatisticsArgs,
     ToolName,
 } from './types.js';
 
@@ -237,6 +240,69 @@ export function validateEurostatGetDataArgs(args: unknown): EurostatGetDataArgs 
 /**
  * ツール名に応じた引数の検証関数を取得
  */
+/**
+ * チャート生成の引数を検証
+ */
+export function validateGenerateChartArgs(args: unknown): GenerateChartArgs {
+    if (typeof args !== 'object' || args === null) {
+        throw new ValidationError('引数はオブジェクトである必要があります');
+    }
+
+    const obj = args as Record<string, unknown>;
+
+    // chartType
+    if (!('chartType' in obj) || typeof obj.chartType !== 'string') {
+        throw new ValidationError('chartTypeは必須で、文字列である必要があります', 'chartType');
+    }
+    if (!['line', 'bar', 'pie'].includes(obj.chartType as string)) {
+        throw new ValidationError('chartTypeは line, bar, pie のいずれかである必要があります', 'chartType');
+    }
+
+    // dataSource
+    if (!('dataSource' in obj) || typeof obj.dataSource !== 'string') {
+        throw new ValidationError('dataSourceは必須で、文字列である必要があります', 'dataSource');
+    }
+    if (!['worldbank', 'estat'].includes(obj.dataSource as string)) {
+        throw new ValidationError('dataSourceは worldbank, estat のいずれかである必要があります', 'dataSource');
+    }
+
+    // dataParams
+    if (!('dataParams' in obj) || typeof obj.dataParams !== 'object' || obj.dataParams === null) {
+        throw new ValidationError('dataParamsは必須で、オブジェクトである必要があります', 'dataParams');
+    }
+
+    const dataParams = obj.dataParams as Record<string, unknown>;
+    const dataSource = obj.dataSource as string;
+
+    // World Bank用のバリデーション
+    if (dataSource === 'worldbank') {
+        if (!dataParams.countryCode || typeof dataParams.countryCode !== 'string') {
+            throw new ValidationError('World Bankデータソースの場合、dataParams.countryCodeは必須です', 'dataParams.countryCode');
+        }
+        if (!dataParams.indicatorCode || typeof dataParams.indicatorCode !== 'string') {
+            throw new ValidationError('World Bankデータソースの場合、dataParams.indicatorCodeは必須です', 'dataParams.indicatorCode');
+        }
+    }
+
+    // e-Stat用のバリデーション
+    if (dataSource === 'estat') {
+        if (!dataParams.statsDataId || typeof dataParams.statsDataId !== 'string') {
+            throw new ValidationError('e-Statデータソースの場合、dataParams.statsDataIdは必須です', 'dataParams.statsDataId');
+        }
+    }
+
+    return {
+        chartType: obj.chartType as 'line' | 'bar' | 'pie',
+        dataSource: obj.dataSource as 'worldbank' | 'estat',
+        dataParams: dataParams as GenerateChartArgs['dataParams'],
+        title: obj.title as string | undefined,
+        xLabel: obj.xLabel as string | undefined,
+        yLabel: obj.yLabel as string | undefined,
+        width: obj.width as number | undefined,
+        height: obj.height as number | undefined,
+    };
+}
+
 export function getValidator(toolName: ToolName) {
     switch (toolName) {
         case 'estat_search_stats':

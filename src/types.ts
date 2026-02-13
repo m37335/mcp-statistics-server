@@ -26,7 +26,7 @@ export interface EStatGetDataArgs {
  * World Bank指標データ取得の引数
  */
 export interface WorldBankGetIndicatorArgs {
-    /** 国コード（必須、例: JP, US, CN） */
+    /** 国コード（必須、例: JP, US, CN。複数国はセミコロン区切り: USA;JPN） */
     countryCode: string;
     /** 指標コード（必須、例: NY.GDP.MKTP.CD） */
     indicatorCode: string;
@@ -71,6 +71,100 @@ export interface EurostatGetDataArgs {
 }
 
 /**
+ * チャート生成の引数
+ */
+export interface GenerateChartArgs {
+    /** チャートタイプ（line, bar, pie） */
+    chartType: 'line' | 'bar' | 'pie';
+    /** データソース（worldbank, estat等） */
+    dataSource: 'worldbank' | 'estat';
+    /** データソース固有のパラメータ */
+    dataParams: {
+        // World Bank用
+        countryCode?: string;
+        indicatorCode?: string;
+        startYear?: number;
+        endYear?: number;
+        // e-Stat用
+        statsDataId?: string;
+        limit?: number;
+    };
+    /** チャートタイトル */
+    title?: string;
+    /** X軸ラベル */
+    xLabel?: string;
+    /** Y軸ラベル */
+    yLabel?: string;
+    /** チャート幅（デフォルト: 800） */
+    width?: number;
+    /** チャート高さ（デフォルト: 400） */
+    height?: number;
+}
+
+/**
+ * データ出力の引数（専門ツール用）
+ */
+export interface ExportDataArgs {
+    /** データソース（worldbank, estat等） */
+    dataSource: 'worldbank' | 'estat';
+    /** データソース固有のパラメータ */
+    dataParams: {
+        // World Bank用
+        countryCode?: string;
+        indicatorCode?: string;
+        startYear?: number;
+        endYear?: number;
+        // e-Stat用
+        statsDataId?: string;
+        limit?: number;
+    };
+    /** 出力形式（csv, json, json-structured） */
+    format: 'csv' | 'json' | 'json-structured';
+    /** データの整形オプション */
+    transform?: {
+        /** 時系列形式に変換 */
+        asTimeSeries?: {
+            dateColumn: string;
+            valueColumn: string;
+            groupColumn?: string;
+        };
+        /** ピボット形式に変換 */
+        asPivot?: {
+            indexColumn: string;
+            columnsColumn: string;
+            valuesColumn: string;
+        };
+        /** フィルタリング条件 */
+        filter?: Record<string, unknown>;
+        /** ソート条件 */
+        sort?: Array<{ column: string; order: 'asc' | 'desc' }>;
+    };
+}
+
+/**
+ * 基本的な統計量計算の引数
+ */
+export interface CalculateStatisticsArgs {
+    /** データソース（worldbank, estat等） */
+    dataSource: 'worldbank' | 'estat';
+    /** データソース固有のパラメータ */
+    dataParams: {
+        countryCode?: string;
+        indicatorCode?: string;
+        startYear?: number;
+        endYear?: number;
+        statsDataId?: string;
+        limit?: number;
+    };
+    /** 計算する統計量 */
+    statistics: Array<'mean' | 'median' | 'mode' | 'std' | 'variance' | 'min' | 'max' | 'range' | 'q1' | 'q3' | 'iqr'>;
+    /** グループ化する列（オプション） */
+    groupBy?: string;
+    /** 値の列名（オプション、デフォルト: 'value'） */
+    valueColumn?: string;
+}
+
+/**
  * ツール名と引数の型マッピング
  */
 export type ToolArgsMap = {
@@ -80,6 +174,9 @@ export type ToolArgsMap = {
     worldbank_search_indicators: WorldBankSearchIndicatorsArgs;
     oecd_get_data: OECDGetDataArgs;
     eurostat_get_data: EurostatGetDataArgs;
+    generate_chart: GenerateChartArgs;
+    export_data: ExportDataArgs;
+    calculate_statistics: CalculateStatisticsArgs;
 };
 
 /**

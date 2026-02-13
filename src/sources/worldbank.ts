@@ -40,6 +40,8 @@ export class WorldBankClient {
         
         return withRetry(async () => {
             try {
+                // 複数国はセミコロン区切りで指定可能（例: USA;JPN）
+                // World Bank APIはセミコロン区切りをサポート
                 const url = `${this.config.baseUrl}/country/${params.countryCode}/indicator/${params.indicatorCode}`;
                 const response = await axios.get(url, {
                     params: {
