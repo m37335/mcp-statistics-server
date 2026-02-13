@@ -8,29 +8,22 @@ import {
     ListToolsRequestSchema,
     ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { readFile } from 'fs/promises';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
 
+import { loadConfig } from './config.js';
 import { EStatClient } from './sources/estat.js';
 import { WorldBankClient } from './sources/worldbank.js';
 import { OECDClient } from './sources/oecd.js';
 import { EurostatClient } from './sources/eurostat.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// 設定ファイルを読み込み
-const configPath = join(__dirname, '../config.json');
-const configData = await readFile(configPath, 'utf-8');
-const config = JSON.parse(configData);
+// 設定を読み込み（環境変数 > config.json）
+const config = await loadConfig();
 
 // データソースクライアントを初期化
 const clients = {
     estat: config.dataSources.estat.enabled
         ? new EStatClient({
             baseUrl: config.dataSources.estat.baseUrl,
-            apiKey: config.dataSources.estat.apiKey,
+            apiKey: config.dataSources.estat.apiKey!,
         })
         : null,
     worldbank: config.dataSources.worldbank.enabled
@@ -93,7 +86,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         throw new Error(`Unknown resource: ${uri}`);
     }
 
-    const sourceKey = match[1];
+    const sourceKey = match[1] as keyof typeof config.dataSources;
     const sourceConfig = config.dataSources[sourceKey];
 
     if (!sourceConfig || !sourceConfig.enabled) {

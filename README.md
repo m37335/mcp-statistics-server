@@ -41,6 +41,32 @@ cp config.example.json config.json
 
 > **重要**: `config.json` は `.gitignore` に含まれており、GitHubにプッシュされません。APIキーは安全に保管されます。
 
+**環境変数を使用する場合（推奨）**:
+
+環境変数を使用すると、より安全に設定を管理できます：
+
+```bash
+# .envファイルを作成
+cp .env.example .env
+
+# .envファイルを編集してAPIキーを設定
+ESTAT_API_KEY=your_actual_api_key_here
+```
+
+環境変数は `config.json` より優先されます。利用可能な環境変数：
+
+- `ESTAT_API_KEY` - e-Stat APIキー
+- `ESTAT_BASE_URL` - e-Stat ベースURL（オプション）
+- `ESTAT_ENABLED` - e-Statを有効化（true/false）
+- `WORLDBANK_BASE_URL` - World Bank ベースURL（オプション）
+- `WORLDBANK_ENABLED` - World Bankを有効化（true/false）
+- `OECD_BASE_URL` - OECD ベースURL（オプション）
+- `OECD_ENABLED` - OECDを有効化（true/false）
+- `EUROSTAT_BASE_URL` - Eurostat ベースURL（オプション）
+- `EUROSTAT_ENABLED` - Eurostatを有効化（true/false）
+
+> **Note**: `.env` ファイルも `.gitignore` に含まれており、GitHubにプッシュされません。
+
 **APIキーの取得方法：**
 
 - **e-Stat**: https://www.e-stat.go.jp/api/ でアカウント登録後、APIキーを取得
