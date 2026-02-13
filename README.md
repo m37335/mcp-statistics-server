@@ -382,6 +382,12 @@ npm run build
 2. データソースのAPIエンドポイントが変更されていないか確認
 3. ログを確認して詳細なエラー情報を確認
 
+### GitHub Actions（CI）が失敗する場合
+
+- **`npm ci` で "Missing from lock file"** → ローカルで `npm install` してから `package-lock.json` をコミット・プッシュする。
+- **ビルド・テスト・リント** → ローカルで `npm ci && npm run build && npm test && npm run lint` を実行し、同じエラーが出ないか確認する。  
+  Actions のログでどのステップで失敗しているかを確認すると原因を特定しやすい。
+
 ### テストエラー
 
 テストが失敗する場合：
