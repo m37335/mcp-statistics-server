@@ -9,27 +9,50 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+/**
+ * データソースの設定
+ */
 export interface DataSourceConfig {
+    /** データソース名 */
     name: string;
+    /** APIのベースURL */
     baseUrl: string;
+    /** APIキー（不要な場合はnull） */
     apiKey: string | null;
+    /** データソースが有効かどうか */
     enabled: boolean;
+    /** データソースの説明 */
     description: string;
+    /** ライセンス情報 */
     license: string;
 }
 
+/**
+ * サーバーの設定
+ */
 export interface ServerConfig {
+    /** サーバー名 */
     name: string;
+    /** サーバーバージョン */
     version: string;
 }
 
+/**
+ * アプリケーション全体の設定
+ */
 export interface Config {
+    /** データソースの設定 */
     dataSources: {
+        /** e-Stat（日本政府統計）の設定 */
         estat: DataSourceConfig;
+        /** World Bank Dataの設定 */
         worldbank: DataSourceConfig;
+        /** OECD Dataの設定 */
         oecd: DataSourceConfig;
+        /** Eurostatの設定 */
         eurostat: DataSourceConfig;
     };
+    /** サーバーの設定 */
     server: ServerConfig;
 }
 

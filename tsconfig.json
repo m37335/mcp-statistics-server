@@ -16,7 +16,13 @@
         "src/**/*"
     ],
     "exclude": [
+        "src/**/__tests__/**",
+        "src/**/*.test.ts"
+    ],
+    "exclude": [
         "node_modules",
-        "dist"
+        "dist",
+        "src/**/__tests__/**",
+        "src/**/*.test.ts"
     ]
 }

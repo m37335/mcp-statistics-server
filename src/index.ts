@@ -14,6 +14,18 @@ import { EStatClient } from './sources/estat.js';
 import { WorldBankClient } from './sources/worldbank.js';
 import { OECDClient } from './sources/oecd.js';
 import { EurostatClient } from './sources/eurostat.js';
+import { getValidator, ValidationError } from './validation.js';
+import { ApiError, formatErrorForUser } from './errors.js';
+import { defaultLogger } from './logger.js';
+import type {
+    ToolName,
+    EStatSearchStatsArgs,
+    EStatGetDataArgs,
+    WorldBankGetIndicatorArgs,
+    WorldBankSearchIndicatorsArgs,
+    OECDGetDataArgs,
+    EurostatGetDataArgs,
+} from './types.js';
 
 // 設定を読み込み（環境変数 > config.json）
 const config = await loadConfig();
@@ -63,12 +75,11 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
 
     // 各データソースの情報をリソースとして公開
     for (const [key, sourceConfig] of Object.entries(config.dataSources)) {
-        const source = sourceConfig as any;
-        if (source.enabled) {
+        if (sourceConfig.enabled) {
             resources.push({
                 uri: `stats://${key}/info`,
-                name: `${source.name} - 情報`,
-                description: source.description,
+                name: `${sourceConfig.name} - 情報`,
+                description: sourceConfig.description,
                 mimeType: 'application/json',
             });
         }
@@ -265,91 +276,119 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 // ツールを実行
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+    const startTime = Date.now();
 
     try {
+        // ツール名の検証
+        const toolName = name as ToolName;
+        
+        // リクエストログ
+        defaultLogger.logRequest(toolName, args);
+        
+        // 引数のバリデーション
+        const validator = getValidator(toolName);
+        const validatedArgs = validator(args);
+
+        let result: unknown;
+
         // e-Stat
-        if (name === 'estat_search_stats' && clients.estat) {
-            const result = await clients.estat.getStatsList(args as any);
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify(result, null, 2),
-                    },
-                ],
-            };
+        if (toolName === 'estat_search_stats' && clients.estat) {
+            result = await clients.estat.getStatsList(validatedArgs as EStatSearchStatsArgs);
+        } else if (toolName === 'estat_get_data' && clients.estat) {
+            result = await clients.estat.getStatsData(validatedArgs as EStatGetDataArgs);
         }
-
-        if (name === 'estat_get_data' && clients.estat) {
-            const result = await clients.estat.getStatsData(args as any);
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify(result, null, 2),
-                    },
-                ],
-            };
-        }
-
         // World Bank
-        if (name === 'worldbank_get_indicator' && clients.worldbank) {
-            const result = await clients.worldbank.getIndicatorData(args as any);
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify(result, null, 2),
-                    },
-                ],
-            };
+        else if (toolName === 'worldbank_get_indicator' && clients.worldbank) {
+            result = await clients.worldbank.getIndicatorData(validatedArgs as WorldBankGetIndicatorArgs);
+        } else if (toolName === 'worldbank_search_indicators' && clients.worldbank) {
+            result = await clients.worldbank.getIndicators(validatedArgs as WorldBankSearchIndicatorsArgs);
         }
-
-        if (name === 'worldbank_search_indicators' && clients.worldbank) {
-            const result = await clients.worldbank.getIndicators(args as any);
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify(result, null, 2),
-                    },
-                ],
-            };
-        }
-
         // OECD
-        if (name === 'oecd_get_data' && clients.oecd) {
-            const result = await clients.oecd.getData(args as any);
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify(result, null, 2),
-                    },
-                ],
-            };
+        else if (toolName === 'oecd_get_data' && clients.oecd) {
+            result = await clients.oecd.getData(validatedArgs as OECDGetDataArgs);
         }
-
         // Eurostat
-        if (name === 'eurostat_get_data' && clients.eurostat) {
-            const result = await clients.eurostat.getData(args as any);
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify(result, null, 2),
-                    },
-                ],
-            };
+        else if (toolName === 'eurostat_get_data' && clients.eurostat) {
+            result = await clients.eurostat.getData(validatedArgs as EurostatGetDataArgs);
+        } else {
+            throw new Error(`Unknown tool: ${name}`);
         }
 
-        throw new Error(`Unknown tool: ${name}`);
-    } catch (error) {
+        const duration = Date.now() - startTime;
+        defaultLogger.logResponse(toolName, true, duration);
+
         return {
             content: [
                 {
                     type: 'text',
-                    text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+                    text: JSON.stringify(result, null, 2),
+                },
+            ],
+        };
+    } catch (error) {
+        const duration = Date.now() - startTime;
+        const toolName = name as ToolName;
+        
+        // エラーログ
+        if (error instanceof Error) {
+            defaultLogger.error(`Tool execution failed: ${toolName}`, error, {
+                tool: toolName,
+                duration,
+            });
+        } else {
+            defaultLogger.error(`Tool execution failed: ${toolName}`, undefined, {
+                tool: toolName,
+                duration,
+                error: String(error),
+            });
+        }
+
+        defaultLogger.logResponse(toolName, false, duration);
+
+        // バリデーションエラーの場合
+        if (error instanceof ValidationError) {
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify({
+                            error: 'ValidationError',
+                            message: error.message,
+                            field: error.field,
+                        }, null, 2),
+                    },
+                ],
+                isError: true,
+            };
+        }
+
+        // APIエラーの場合
+        if (error instanceof ApiError) {
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify({
+                            error: 'ApiError',
+                            source: error.source,
+                            message: error.message,
+                            details: error.details,
+                        }, null, 2),
+                    },
+                ],
+                isError: true,
+            };
+        }
+
+        // その他のエラー
+        return {
+            content: [
+                {
+                    type: 'text',
+                    text: JSON.stringify({
+                        error: 'Error',
+                        message: formatErrorForUser(error),
+                    }, null, 2),
                 },
             ],
             isError: true,
@@ -359,12 +398,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // サーバーを起動
 async function main() {
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    console.error('MCP Statistics Server running on stdio');
+    try {
+        defaultLogger.info('Starting MCP Statistics Server', {
+            name: config.server.name,
+            version: config.server.version,
+        });
+
+        const transport = new StdioServerTransport();
+        await server.connect(transport);
+        
+        defaultLogger.info('MCP Statistics Server running on stdio');
+    } catch (error) {
+        defaultLogger.error('Failed to start server', error instanceof Error ? error : undefined);
+        process.exit(1);
+    }
 }
 
 main().catch((error) => {
-    console.error('Server error:', error);
+    defaultLogger.error('Unhandled server error', error instanceof Error ? error : undefined);
     process.exit(1);
 });
